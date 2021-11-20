@@ -1,0 +1,2 @@
+# Introduction
+This example demonstrates a simple Lua integer array written in C++ by means of Lua's C API. The array supports basic operations such as creating new array, setting new values, and getting target values.
