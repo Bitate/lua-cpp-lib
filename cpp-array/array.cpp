@@ -3,6 +3,9 @@
 
 using namespace std;
 
+#define check_array(L) \
+    (IntegerArray**)luaL_checkudata(L, 1, "array.meta")
+
 extern "C" {
     #include <lua5.3/lua.h>
     #include <lua5.3/lauxlib.h>
@@ -64,7 +67,11 @@ static int new_array(lua_State* L)
 
     IntegerArray* array = new IntegerArray(size);
 
-    *(IntegerArray**)lua_newuserdata(L, sizeof(IntegerArray)) = array;
+    *(IntegerArray**)lua_newuserdata(L, sizeof(IntegerArray*)) = array;
+
+    // for each userdata, we associate it with a metatable
+    luaL_getmetatable(L, "array.meta");
+    lua_setmetatable(L, -2);
     
     return 1;
 }
@@ -76,7 +83,7 @@ static int new_array(lua_State* L)
  */
 static int set(lua_State* L)
 {
-    IntegerArray** array = (IntegerArray**)lua_touserdata(L, 1);
+    auto array = check_array(L);
 
     int index = (int)luaL_checkinteger(L, -2);
     int value = (int)luaL_checkinteger(L, -1);
@@ -91,7 +98,7 @@ static int set(lua_State* L)
  */
 static int get(lua_State* L)
 {
-    IntegerArray** array = (IntegerArray**)lua_touserdata(L, 1);
+    auto array = check_array(L);
 
     int index = (int)lua_tointeger(L, -1);
 
@@ -107,15 +114,23 @@ static int get(lua_State* L)
  */
 static int size(lua_State* L)
 {
-    IntegerArray** array = (IntegerArray**)lua_touserdata(L, 1);
+    auto array = check_array(L);
 
     lua_pushinteger(L, (*array)->size());
 
     return 1;
 }
 
-static const luaL_Reg array_lib[] = {
-    {"new", new_array},
+// library functions
+// used in lua like: a = array.new(1000)
+static const luaL_Reg array_lib_f[] = {
+    { "new", new_array },
+    { nullptr, nullptr }
+};
+
+// library methods
+// used in lua like: object:get()
+static const luaL_Reg array_lib_m[] = {
     {"set", set},
     {"get", get},
     {"size", size},
@@ -124,7 +139,12 @@ static const luaL_Reg array_lib[] = {
 
 extern "C" int luaopen_array(lua_State* L)
 {
-    luaL_newlib(L, array_lib);
+    luaL_newmetatable(L, "array.meta");
+    lua_pushvalue(L, -1);   // duplicate the metatale
+    lua_setfield(L, -2, "__index");
+    luaL_setfuncs(L, array_lib_m, 0);   // register all metamethods
+
+    luaL_newlib(L, array_lib_f);    // register all library functions
     return 1;
 }
 
